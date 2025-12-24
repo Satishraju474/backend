@@ -73,6 +73,52 @@ const importData = async () => {
             console.log('Registrar User already exists');
         }
 
+        // Check if librarian exists
+        const librarianExists = await User.findOne({ role: 'librarian' });
+
+        if (!librarianExists) {
+            await User.create({
+                username: 'librarian',
+                password: 'librarianpassword123',
+                role: 'librarian',
+                name: 'Chief Librarian',
+                email: 'librarian@college.edu'
+            });
+            console.log('Librarian User Created: username=librarian, password=librarianpassword123');
+        } else {
+            console.log('Librarian User already exists');
+        }
+
+        // Check if placement officer exists
+        const placementExists = await User.findOne({ role: 'placement_officer' });
+        if (!placementExists) {
+            await User.create({
+                username: 'placement_officer',
+                password: 'placementpassword123',
+                role: 'placement_officer',
+                name: 'T&P Officer',
+                email: 'placement@college.edu'
+            });
+            console.log('Placement Officer Created: username=placement_officer, password=placementpassword123');
+        } else {
+            console.log('Placement Officer already exists');
+        }
+
+        // Check if hostel warden exists
+        const wardenExists = await User.findOne({ role: 'hostel_warden' });
+        if (!wardenExists) {
+            await User.create({
+                username: 'warden',
+                password: 'wardenpassword123',
+                role: 'hostel_warden',
+                name: 'Hostel Warden',
+                email: 'hostel@college.edu'
+            });
+            console.log('Hostel Warden Created: username=warden, password=wardenpassword123');
+        } else {
+            console.log('Hostel Warden already exists');
+        }
+
         process.exit();
     } catch (error) {
         console.error(`${error}`);

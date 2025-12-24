@@ -345,9 +345,9 @@ const searchStudent = async (req, res) => {
 // @access  Private (Admin)
 const createExamNotification = async (req, res) => {
     try {
-        const { title, year, semester, examFeeAmount, startDate, endDate, description } = req.body;
+        const { title, year, semester, examFeeAmount, startDate, endDate, description, examType } = req.body;
         const notification = await ExamNotification.create({
-            title, year, semester, examFeeAmount, startDate, endDate, description,
+            title, year, semester, examFeeAmount, startDate, endDate, description, examType,
             lastDateWithoutFine: endDate, // Set initial fine deadline to endDate
             lateFee: 0
         });
@@ -388,7 +388,39 @@ const updateExamNotification = async (req, res) => {
 // @access  Public (or Private)
 const getExamNotifications = async (req, res) => {
     try {
-        const notifications = await ExamNotification.find({ isActive: true });
+        const { isActive } = req.query;
+        let query = {};
+
+        if (isActive !== undefined) {
+            query.isActive = isActive === 'true';
+        }
+
+        // If user is logged in (req.user exists due to protect middleware usually, but this route might be semi-public)
+        // If it's a student, we apply visibility logic.
+        if (req.user && req.user.role === 'student') {
+            const student = await Student.findOne({ user: req.user._id });
+            if (student) {
+                const currentYear = student.currentYear;
+
+                // LOGIC:
+                // 1. Regular Exams: Must match student's current year exactly.
+                // 2. Supplementary Exams: Visible if Notification Year <= Student Current Year.
+                //    (e.g., Year 1 Supply is visible to Year 1, 2, 3, 4)
+
+                query.$or = [
+                    { examType: 'regular', year: currentYear },
+                    { examType: 'supplementary', year: { $lte: currentYear } },
+                    { examType: { $exists: false }, year: currentYear } // Backward compat
+                ];
+                // Ensure we only get active ones for students regardless of query param usually, 
+                // but let's respect the query param if passed, otherwise default to active.
+                if (isActive === undefined) query.isActive = true;
+            }
+        }
+
+        // If admin/others, they see everything based on query.
+
+        const notifications = await ExamNotification.find(query).sort({ createdAt: -1 });
         res.json(notifications);
     } catch (error) {
         res.status(500).json({ message: error.message });

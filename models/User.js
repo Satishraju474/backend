@@ -6,13 +6,16 @@ const userSchema = mongoose.Schema({
     password: { type: String, required: true },
     role: {
         type: String,
-        enum: ['student', 'admin', 'principal', 'exam_head', 'transport_dept', 'registrar'],
+        enum: ['student', 'admin', 'principal', 'exam_head', 'transport_dept', 'registrar', 'librarian', 'placement_officer', 'hostel_warden'],
         required: true
     },
     name: { type: String, required: true },
     email: { type: String },
     photoUrl: { type: String, default: '' }
 }, { timestamps: true });
+
+// Add Indexes for performance
+userSchema.index({ name: 1 }); // Useful for searching users by name
 
 // Check if password matches
 userSchema.methods.matchPassword = async function (enteredPassword) {

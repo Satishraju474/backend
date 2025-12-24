@@ -11,8 +11,10 @@ const createStudent = async (req, res) => {
             username, password, name, department, currentYear,
             quota, entry, email,
             transportOpted, // Boolean
+            hostelOpted, // Boolean - Added for Hostel
             assignedCollegeFee, // For Management Quota
-            assignedTransportFee // If transportOpted is true
+            assignedTransportFee, // If transportOpted is true
+            assignedHostelFee // If hostelOpted is true
         } = req.body;
 
         // 1. Create User
@@ -94,6 +96,32 @@ const createStudent = async (req, res) => {
             });
         }
 
+        let initialHostelFee = 0;
+        if (hostelOpted) {
+            initialHostelFee = assignedHostelFee || 0;
+        }
+
+        // Hostel Fee Split
+        if (initialHostelFee > 0) {
+            const splitHostel = Math.ceil(initialHostelFee / 2);
+            feeRecords.push({
+                year: currentYearNum,
+                semester: semA,
+                feeType: 'hostel',
+                amountDue: splitHostel,
+                status: 'pending',
+                transactions: []
+            });
+            feeRecords.push({
+                year: currentYearNum,
+                semester: semB,
+                feeType: 'hostel',
+                amountDue: initialHostelFee - splitHostel,
+                status: 'pending',
+                transactions: []
+            });
+        }
+
         const student = await Student.create({
             user: user._id,
             usn: username,
@@ -102,8 +130,10 @@ const createStudent = async (req, res) => {
             quota,
             entry,
             transportOpted: transportOpted || false,
+            hostelOpted: hostelOpted || false,
             collegeFeeDue: initialCollegeFee, // Keep total for high-level view
             transportFeeDue: initialTransportFee,
+            hostelFeeDue: initialHostelFee,
             feeRecords: feeRecords
         });
 

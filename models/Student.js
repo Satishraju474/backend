@@ -9,17 +9,19 @@ const studentSchema = mongoose.Schema({
     entry: { type: String, enum: ['regular', 'lateral'], required: true },
     status: { type: String, enum: ['active', 'detained', 'dropout'], default: 'active' },
 
-    // Fees Due Status (Managed by Admin/Accounts/Transport)
+    // Fees Due Status
     transportOpted: { type: Boolean, default: false },
+    hostelOpted: { type: Boolean, default: false }, // Added Hostel Opted
     collegeFeeDue: { type: Number, default: 0 },
     transportFeeDue: { type: Number, default: 0 },
-    lastSemDues: { type: Number, default: 0 }, // Keeping as "Previous Dues" generically
+    hostelFeeDue: { type: Number, default: 0 }, // Added Hostel Fee Due
+    lastSemDues: { type: Number, default: 0 },
 
     // Professional Fee Management (Ledger)
     feeRecords: [{
         year: { type: Number, required: true },
-        semester: { type: Number, required: true }, // Added Semester tracking
-        feeType: { type: String, enum: ['college', 'transport', 'other'], required: true },
+        semester: { type: Number, required: true },
+        feeType: { type: String, enum: ['college', 'transport', 'other', 'placement', 'hostel'], required: true }, // Added hostel
         amountDue: { type: Number, required: true },
         amountPaid: { type: Number, default: 0 },
         status: { type: String, enum: ['pending', 'partial', 'paid'], default: 'pending' },
