@@ -109,22 +109,7 @@ const checkEligibility = async (req, res) => {
             }
         });
 
-        if (student.lastSemDues > 0) {
-            isEligible = false;
-            reasons.push(`Pending Last Semester Dues: ${student.lastSemDues}`);
-        }
 
-        res.json({
-            isEligible,
-            reasons,
-            student: {
-                usn: student.usn,
-                name: req.user.name,
-                collegeFeeDue: student.collegeFeeDue,
-                transportFeeDue: student.transportFeeDue,
-                lastSemDues: student.lastSemDues
-            }
-        });
 
     } catch (error) {
         res.status(500).json({ message: error.message });

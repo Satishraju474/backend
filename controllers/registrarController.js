@@ -138,4 +138,22 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports = { createStudent, resetPassword };
+// @desc    Get Student Details by USN
+// @route   GET /api/registrar/students/:usn
+// @access  Private (Registrar)
+const getStudentByUSN = async (req, res) => {
+    try {
+        const student = await Student.findOne({ usn: req.params.usn })
+            .populate('user', 'name email photoUrl role');
+
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        res.json(student);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { createStudent, resetPassword, getStudentByUSN };

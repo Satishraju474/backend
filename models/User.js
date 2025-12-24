@@ -10,7 +10,8 @@ const userSchema = mongoose.Schema({
         required: true
     },
     name: { type: String, required: true },
-    email: { type: String }
+    email: { type: String },
+    photoUrl: { type: String, default: '' }
 }, { timestamps: true });
 
 // Check if password matches
