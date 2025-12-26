@@ -664,6 +664,133 @@ const promoteStudents = async (req, res) => {
     }
 };
 
+// @desc    Get Analytics Data
+// @route   GET /api/admin/analytics
+// @access  Private (Admin)
+const getAnalytics = async (req, res) => {
+    // console.log("Analytics Request Received:", req.query);
+    try {
+        const { year, department } = req.query;
+        let matchStage = { status: 'active' };
+
+        // Apply Filters
+        if (year && year !== 'all') {
+            matchStage.currentYear = Number(year);
+        }
+
+        if (department && department !== 'all') {
+            matchStage.department = department; // Exact match (e.g., 'CSE', 'ECE')
+        }
+
+        // Determine Facet Logic for Breakdown
+        let groupBy = "$department"; // Default: Group by Department
+        let labelPrefix = "";
+
+        if (department !== 'all' && year === 'all') {
+            // Specific Dept, All Years -> Group by Year
+            groupBy = "$currentYear";
+            labelPrefix = "Year ";
+        } else if (department !== 'all' && year !== 'all') {
+            // Specific Dept, Specific Year -> Single Group (Summary)
+            groupBy = "Summary"; // Constant
+        }
+
+        const stats = await Student.aggregate([
+            { $match: matchStage },
+            {
+                $project: {
+                    department: 1,
+                    currentYear: 1,
+                    totalStudentDue: {
+                        $add: [
+                            { $ifNull: ["$collegeFeeDue", 0] },
+                            { $ifNull: ["$transportFeeDue", 0] },
+                            { $ifNull: ["$hostelFeeDue", 0] },
+                            { $ifNull: ["$placementFeeDue", 0] }
+                        ]
+                    },
+                    // Pass through individual dues for overall sum
+                    collegeFeeDue: { $ifNull: ["$collegeFeeDue", 0] },
+                    transportFeeDue: { $ifNull: ["$transportFeeDue", 0] },
+                    hostelFeeDue: { $ifNull: ["$hostelFeeDue", 0] },
+                    placementFeeDue: { $ifNull: ["$placementFeeDue", 0] }
+                }
+            },
+            {
+                $facet: {
+                    // Overall Stats
+                    overall: [
+                        {
+                            $group: {
+                                _id: null,
+                                totalStudents: { $sum: 1 },
+                                fullyPaid: { $sum: { $cond: [{ $eq: ["$totalStudentDue", 0] }, 1, 0] } },
+                                pending: { $sum: { $cond: [{ $gt: ["$totalStudentDue", 0] }, 1, 0] } },
+                                totalCollegeDue: { $sum: "$collegeFeeDue" },
+                                totalTransportDue: { $sum: "$transportFeeDue" },
+                                totalHostelDue: { $sum: "$hostelFeeDue" },
+                                totalPlacementDue: { $sum: "$placementFeeDue" },
+                                totalOverallDue: { $sum: "$totalStudentDue" }
+                            }
+                        }
+                    ],
+                    // Dynamic Breakdown
+                    breakdown: [
+                        {
+                            $group: {
+                                _id: groupBy,
+                                fullyPaid: { $sum: { $cond: [{ $eq: ["$totalStudentDue", 0] }, 1, 0] } },
+                                pending: { $sum: { $cond: [{ $gt: ["$totalStudentDue", 0] }, 1, 0] } }
+                            }
+                        },
+                        { $sort: { _id: 1 } }
+                    ]
+                }
+            }
+        ]);
+
+        const overallStats = stats[0].overall[0] || {
+            totalStudents: 0,
+            fullyPaid: 0,
+            pending: 0,
+            totalCollegeDue: 0,
+            totalTransportDue: 0,
+            totalHostelDue: 0,
+            totalPlacementDue: 0,
+            totalOverallDue: 0
+        };
+
+        const rawBreakdown = stats[0].breakdown || [];
+
+        // Normalize Breakdown for Frontend
+        const formattedBreakdown = rawBreakdown.map(item => {
+            let label = item._id;
+
+            // Format Label based on what we grouped by
+            if (department !== 'all' && year === 'all') {
+                label = `Year ${item._id}`;
+            } else if (department !== 'all' && year !== 'all') {
+                label = `${department} - Year ${year}`;
+            }
+
+            return {
+                label: label || 'Unknown', // Standardized Key
+                fullyPaid: item.fullyPaid,
+                pending: item.pending
+            };
+        });
+
+        res.json({
+            ...overallStats,
+            breakdown: formattedBreakdown
+        });
+
+    } catch (error) {
+        console.error("Analytics Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     createStudent,
     updateStudentFees,
@@ -676,5 +803,6 @@ module.exports = {
     getSystemConfig,
     searchStudent,
     getStudentsByYear,
-    promoteStudents
+    promoteStudents,
+    getAnalytics
 };
