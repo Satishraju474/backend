@@ -31,8 +31,11 @@ app.use('/api/transport', require('./routes/transportRoutes'));
 app.use('/api/registrar', require('./routes/registrarRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/library', require('./routes/libraryRoutes'));
+app.use('/api/librarian', require('./routes/libraryRoutes')); // Alias
 app.use('/api/placement', require('./routes/placementRoutes'));
 app.use('/api/hostel', require('./routes/hostelRoutes'));
+app.use('/api/admission', require('./routes/admissionRoutes'));
+app.use('/api/exam-head', require('./routes/examHeadRoutes'));
 
 // Make uploads folder static
 const path = require('path');

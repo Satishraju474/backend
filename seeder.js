@@ -9,115 +9,85 @@ connectDB();
 
 const importData = async () => {
     try {
-        // Check if admin exists
-        const adminExists = await User.findOne({ role: 'admin' });
+        const rolesToReset = [
+            'admin',
+            'admission_officer',
+            'hostel_manager',
+            'librarian',
+            'placement_officer',
+            'transport_dept',
+            'registrar',
+            'exam_head'
+        ];
 
-        if (!adminExists) {
-            await User.create({
+        // Remove existing users with these roles
+        console.log('Removing old administrative users...');
+        await User.deleteMany({ role: { $in: rolesToReset } });
+        console.log('Old users removed.');
+
+        const newUsers = [
+            {
                 username: 'admin',
-                password: 'adminpassword123', // Change this in production
+                password: '123',
                 role: 'admin',
                 name: 'System Admin',
                 email: 'admin@college.edu'
-            });
-            console.log('Admin User Created: username=admin, password=adminpassword123');
-        } else {
-            console.log('Admin User already exists');
-        }
-
-        // Check if exam head exists
-        const examHeadExists = await User.findOne({ role: 'exam_head' });
-
-        if (!examHeadExists) {
-            await User.create({
-                username: 'examhead',
-                password: 'examheadpassword123',
-                role: 'exam_head',
-                name: 'Chief Examiner',
-                email: 'examhead@college.edu'
-            });
-            console.log('Exam Head User Created: username=examhead, password=examheadpassword123');
-        } else {
-            console.log('Exam Head User already exists');
-        }
-
-        // Check if transport dept exists
-        const transportExists = await User.findOne({ role: 'transport_dept' });
-
-        if (!transportExists) {
-            await User.create({
-                username: 'transport',
-                password: 'transportpassword123',
-                role: 'transport_dept',
-                name: 'Transport Officer',
-                email: 'transport@college.edu'
-            });
-            console.log('Transport User Created: username=transport, password=transportpassword123');
-        } else {
-            console.log('Transport User already exists');
-        }
-
-        // Check if registrar exists
-        const registrarExists = await User.findOne({ role: 'registrar' });
-
-        if (!registrarExists) {
-            await User.create({
-                username: 'registrar',
-                password: 'registrarpassword123',
-                role: 'registrar',
-                name: 'Student Registrar',
-                email: 'registrar@college.edu'
-            });
-            console.log('Registrar User Created: username=registrar, password=registrarpassword123');
-        } else {
-            console.log('Registrar User already exists');
-        }
-
-        // Check if librarian exists
-        const librarianExists = await User.findOne({ role: 'librarian' });
-
-        if (!librarianExists) {
-            await User.create({
-                username: 'librarian',
-                password: 'librarianpassword123',
-                role: 'librarian',
-                name: 'Chief Librarian',
-                email: 'librarian@college.edu'
-            });
-            console.log('Librarian User Created: username=librarian, password=librarianpassword123');
-        } else {
-            console.log('Librarian User already exists');
-        }
-
-        // Check if placement officer exists
-        const placementExists = await User.findOne({ role: 'placement_officer' });
-        if (!placementExists) {
-            await User.create({
-                username: 'placement_officer',
-                password: 'placementpassword123',
-                role: 'placement_officer',
-                name: 'T&P Officer',
-                email: 'placement@college.edu'
-            });
-            console.log('Placement Officer Created: username=placement_officer, password=placementpassword123');
-        } else {
-            console.log('Placement Officer already exists');
-        }
-
-        // Check if hostel warden exists
-        const wardenExists = await User.findOne({ role: 'hostel_warden' });
-        if (!wardenExists) {
-            await User.create({
-                username: 'warden',
-                password: 'wardenpassword123',
-                role: 'hostel_warden',
-                name: 'Hostel Warden',
+            },
+            {
+                username: 'admission_officer',
+                password: '123',
+                role: 'admission_officer',
+                name: 'Admission Officer',
+                email: 'admission@college.edu'
+            },
+            {
+                username: 'hostel_admin',
+                password: '123',
+                role: 'hostel_manager',
+                name: 'Hostel Admin',
                 email: 'hostel@college.edu'
-            });
-            console.log('Hostel Warden Created: username=warden, password=wardenpassword123');
-        } else {
-            console.log('Hostel Warden already exists');
-        }
+            },
+            {
+                username: 'librarian',
+                password: '123',
+                role: 'librarian',
+                name: 'Librarian',
+                email: 'librarian@college.edu'
+            },
+            {
+                username: 'training_dept',
+                password: '123',
+                role: 'placement_officer',
+                name: 'Training Department',
+                email: 'training@college.edu'
+            },
+            {
+                username: 'transport',
+                password: '123',
+                role: 'transport_dept',
+                name: 'Transport',
+                email: 'transport@college.edu'
+            },
+            {
+                username: 'enrollment_help_desk',
+                password: '123',
+                role: 'registrar',
+                name: 'Student Enrollment Help Desk',
+                email: 'enrollment@college.edu'
+            },
+            {
+                username: 'exam_head',
+                password: '123',
+                role: 'exam_head',
+                name: 'Chief of Examinations',
+                email: 'examhead@college.edu'
+            }
+        ];
+
+        // Create new users
+        console.log('Creating new administrative users...');
+        await User.create(newUsers);
+        console.log('New users created successfully.');
 
         process.exit();
     } catch (error) {

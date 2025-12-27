@@ -16,7 +16,7 @@ app.use(express.json());
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes'); // Add this line
 // const principalRoutes = require('./routes/principalRoutes'); // Disabled - File not found
-// const examHeadRoutes = require('./routes/examHeadRoutes'); // Disabled - File not found
+const examHeadRoutes = require('./routes/examHeadRoutes'); // Mount
 const transportRoutes = require('./routes/transportRoutes'); // Add this
 const registrarRoutes = require('./routes/registrarRoutes');
 const librarianRoutes = require('./routes/libraryRoutes'); // Fixed to libraryRoutes
@@ -31,7 +31,7 @@ const hostelRoutes = require('./routes/hostelRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes); // Mount
 // app.use('/api/principal', principalRoutes);
-// app.use('/api/exam-head', examHeadRoutes); // Mount
+app.use('/api/exam-head', examHeadRoutes); // Mount
 app.use('/api/transport', transportRoutes); // Mount
 app.use('/api/registrar', registrarRoutes);
 app.use('/api/librarian', librarianRoutes);

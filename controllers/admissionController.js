@@ -1,21 +1,38 @@
 const Student = require('../models/Student');
+const User = require('../models/User');
 
-// @desc    Search for a student by USN
+// @desc    Search for a student by USN or Name
 // @access  Private (Admission Dept)
 const searchStudent = async (req, res) => {
     try {
         const { query } = req.query;
+        console.log(`[Admission Search] Query: ${query}`);
+
         if (!query) {
             return res.status(400).json({ message: 'Query parameter is required' });
         }
 
-        const student = await Student.findOne({ usn: { $regex: query, $options: 'i' } })
-            .populate('user', 'name email photoUrl');
+        // Find users matching name
+        const matchingUsers = await User.find({
+            name: { $regex: query, $options: 'i' },
+            role: 'student'
+        }).select('_id');
+
+        const matchingUserIds = matchingUsers.map(u => u._id);
+
+        const student = await Student.findOne({
+            $or: [
+                { usn: { $regex: query, $options: 'i' } },
+                { user: { $in: matchingUserIds } }
+            ]
+        }).populate('user', 'name email photoUrl');
 
         if (!student) {
+            console.log(`[Admission Search] Result: Not Found`);
             return res.status(404).json({ message: 'Student not found' });
         }
 
+        console.log(`[Admission Search] Found: ${student.usn}`);
         res.json(student);
     } catch (error) {
         res.status(500).json({ message: error.message });
