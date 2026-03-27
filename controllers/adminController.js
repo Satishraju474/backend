@@ -395,11 +395,45 @@ const searchStudent = async (req, res) => {
 // @route   POST /api/admin/notifications
 const createExamNotification = async (req, res) => {
     try {
-        const { title, year, semester, examFeeAmount, startDate, endDate, description, examType } = req.body;
+        const {
+            title,
+            year,
+            semester,
+            examFeeAmount,
+            startDate,
+            endDate,
+            description,
+            examType,
+            subjects,
+            examCode,
+            examName
+        } = req.body;
+
+        if (!title || !year || !examFeeAmount || !startDate || !endDate) {
+            return res.status(400).json({ message: 'Title, year, fee, start date and end date are required' });
+        }
+
+        // Basic validation for supplementary exams
+        if (examType === 'supplementary') {
+            if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
+                return res.status(400).json({ message: 'Supplementary exams must include at least one subject' });
+            }
+        }
 
         const notification = await ExamNotification.create({
-            title, year, semester, examFeeAmount, startDate, endDate, description, examType,
-            lastDateWithoutFine: endDate, // Set initial fine deadline to endDate
+            title,
+            year,
+            semester,
+            examFeeAmount,
+            startDate,
+            endDate,
+            description,
+            examType,
+            subjects: subjects || [],
+            examCode,
+            examName,
+            // By default, original end date is last date without fine
+            lastDateWithoutFine: endDate,
             lateFee: 0
         });
 
@@ -411,7 +445,13 @@ const createExamNotification = async (req, res) => {
                 action: 'CREATE_EXAM_NOTIFICATION',
                 targetType: 'ExamNotification',
                 targetId: notification._id,
-                details: { title, year, amount: examFeeAmount },
+                details: {
+                    title,
+                    year,
+                    semester,
+                    amount: examFeeAmount,
+                    examType: examType || 'regular'
+                },
                 ipAddress: req.ip
             });
         }
@@ -422,7 +462,7 @@ const createExamNotification = async (req, res) => {
     }
 };
 
-// @desc    Update Exam Notification (Extend Date / Add Penalty)
+// @desc    Update Exam Notification (Extend Date / Add Penalty / Activate-Deactivate)
 // @route   PUT /api/admin/notifications/:id
 const updateExamNotification = async (req, res) => {
     try {
@@ -433,14 +473,21 @@ const updateExamNotification = async (req, res) => {
             return res.status(404).json({ message: 'Notification not found' });
         }
 
-        if (isActive !== undefined) notification.isActive = isActive;
-
-        // Capture Old Values for Diff
         const oldValues = {
             endDate: notification.endDate,
             lateFee: notification.lateFee,
             isActive: notification.isActive
         };
+
+        if (typeof endDate !== 'undefined' && endDate !== null && endDate !== '') {
+            notification.endDate = endDate;
+        }
+        if (typeof lateFee !== 'undefined' && lateFee !== null && lateFee !== '') {
+            notification.lateFee = Number(lateFee) || 0;
+        }
+        if (typeof isActive !== 'undefined') {
+            notification.isActive = Boolean(isActive);
+        }
 
         const updatedNotification = await notification.save();
 
@@ -519,6 +566,33 @@ const getExamNotifications = async (req, res) => {
 
         const notifications = await ExamNotification.find(query).sort({ createdAt: -1 });
         res.json(notifications);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get Stats for Exam Dashboard
+// @route   GET /api/admin/exam-dashboard-stats
+const getExamDashboardStats = async (req, res) => {
+    try {
+        const activeNotifications = await ExamNotification.countDocuments({ isActive: true });
+
+        // Count distinct students who made exam payments
+        const distinctStudents = await Payment.distinct('student', { paymentType: 'exam_fee', status: 'completed' });
+        const studentsApplied = distinctStudents.length;
+
+        // Sum of all exam fees collected
+        const feesCollectedAgg = await Payment.aggregate([
+            { $match: { paymentType: 'exam_fee', status: 'completed' } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const feesCollected = feesCollectedAgg.length > 0 ? feesCollectedAgg[0].total : 0;
+
+        res.json({
+            activeNotifications,
+            studentsApplied,
+            feesCollected
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -1059,6 +1133,7 @@ module.exports = {
     // Verified: updateExamNotification does not allow editing targetBatches, so no validation needed here.
     getExamNotifications,
     getDashboardStats,
+    getExamDashboardStats,
     getStudentsByYear,
     promoteStudents,
     getAnalytics,

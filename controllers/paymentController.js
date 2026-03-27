@@ -11,14 +11,17 @@ const LibraryRecord = require('../models/LibraryRecord');
 // @access  Private (Student)
 const createOrder = async (req, res) => {
     try {
-        const { amount, paymentType, examNotificationId } = req.body; // Accept examNotificationId
+        const { amount, paymentType, examNotificationId, selectedSubjects } = req.body;
 
-        // Basic Validation for Exam Fee if ID provided
+        // Extra safety: normalize amount
+        const requestedAmount = Number(amount);
+
+        // Validation and business rules for exam fee payments
         if (paymentType === 'exam_fee') {
-            // 1. Check Library Dues
             const student = await Student.findOne({ user: req.user._id });
             if (!student) return res.status(404).json({ message: 'Student verification failed' });
 
+            // 1. Block if library books pending (real-life rule)
             const pendingBooks = await LibraryRecord.countDocuments({
                 student: student._id,
                 status: { $ne: 'returned' }
@@ -32,11 +35,111 @@ const createOrder = async (req, res) => {
 
             if (examNotificationId) {
                 const notification = await ExamNotification.findById(examNotificationId);
-                if (notification) {
-                    // Check if Late Fee applies
-                    // Logic: If today > lastDateWithoutFine, Effective Fee = examFee + lateFee
-                    // We can enforce this here or just trust frontend. 
-                    // Let's just log for now to avoid blocking if dates are tricky.
+                if (!notification) {
+                    return res.status(400).json({ message: 'Exam notification not found' });
+                }
+
+                const today = new Date();
+                const withoutFine = notification.lastDateWithoutFine ? new Date(notification.lastDateWithoutFine) : new Date(notification.endDate);
+                const isLateWindow = today > withoutFine;
+                const lateFee = isLateWindow ? (notification.lateFee || 0) : 0;
+
+                // Prevent payments after final end date
+                if (today > new Date(notification.endDate)) {
+                    return res.status(400).json({ message: 'Payment window for this exam has closed.' });
+                }
+
+                // Collect existing completed payments for this exam
+                const existingPayments = await Payment.find({
+                    student: student._id,
+                    paymentType: 'exam_fee',
+                    examNotificationId: notification._id,
+                    status: 'completed'
+                });
+
+                if (notification.examType === 'regular') {
+                    if (existingPayments.length > 0) {
+                        return res.status(400).json({ message: 'Exam fee for this notification is already paid.' });
+                    }
+
+                    // Expected amount = base examFeeAmount (+ late fee if in late window)
+                    let expected = Number(notification.examFeeAmount) || 0;
+                    expected += lateFee;
+
+                    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+                        return res.status(400).json({ message: 'Invalid amount for exam fee.' });
+                    }
+
+                    if (Math.round(requestedAmount) !== Math.round(expected)) {
+                        return res.status(400).json({ message: 'Exam fee amount mismatch. Please refresh and try again.' });
+                    }
+                } else if (notification.examType === 'supplementary') {
+                    if (!selectedSubjects || !Array.isArray(selectedSubjects) || selectedSubjects.length === 0) {
+                        return res.status(400).json({ message: 'Please select at least one subject for supplementary exam.' });
+                    }
+
+                    // Build lookup of valid subjects from notification
+                    const subjectMap = new Map();
+                    (notification.subjects || []).forEach(sub => {
+                        subjectMap.set(sub.subjectCode, sub);
+                    });
+
+                    // Gather already paid subject codes for this exam
+                    const alreadyPaidCodes = new Set();
+                    existingPayments.forEach(p => {
+                        (p.selectedSubjects || []).forEach(s => {
+                            if (s.subjectCode) alreadyPaidCodes.add(s.subjectCode);
+                        });
+                    });
+
+                    // Validate requested subjects
+                    let totalCalc = 0;
+                    const duplicateSubjects = [];
+                    const invalidSubjects = [];
+
+                    selectedSubjects.forEach(sub => {
+                        const code = sub.subjectCode;
+                        if (!code || !subjectMap.has(code)) {
+                            invalidSubjects.push(code || 'UNKNOWN');
+                            return;
+                        }
+                        if (alreadyPaidCodes.has(code)) {
+                            duplicateSubjects.push(code);
+                            return;
+                        }
+                        // We no longer sum individual fees here
+                    });
+
+                    if (invalidSubjects.length > 0) {
+                        return res.status(400).json({
+                            message: `One or more selected subjects are not valid for this exam: ${invalidSubjects.join(', ')}`
+                        });
+                    }
+
+                    if (duplicateSubjects.length > 0) {
+                        return res.status(400).json({
+                            message: `You have already paid for: ${duplicateSubjects.join(', ')}`
+                        });
+                    }
+
+                    // Calculate tiered fee based on number of valid selected subjects
+                    const numSubjects = selectedSubjects.length;
+                    if (numSubjects === 1) totalCalc = 800;
+                    else if (numSubjects === 2) totalCalc = 1200;
+                    else if (numSubjects === 3) totalCalc = 1800;
+                    else if (numSubjects >= 4) totalCalc = 2500;
+
+                    // Add late fee once per transaction if in late window
+                    totalCalc += lateFee;
+
+                    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+                        return res.status(400).json({ message: 'Invalid amount for supplementary exam.' });
+                    }
+
+                    if (Math.round(requestedAmount) !== Math.round(totalCalc)) {
+                        console.log(`Supplementary amount mismatch: requested=${requestedAmount}, expected=${totalCalc}`);
+                        return res.status(400).json({ message: 'Calculated exam amount has changed. Please re-select subjects and try again.' });
+                    }
                 }
             }
         }
@@ -96,7 +199,8 @@ const verifyPayment = async (req, res) => {
             signature,
             paymentType,
             amount,
-            examNotificationId
+            examNotificationId,
+            selectedSubjects
         } = req.body;
 
         // Handle Test Mode gracefully if secret is default
@@ -123,7 +227,8 @@ const verifyPayment = async (req, res) => {
             razorpayOrderId,
             razorpaySignature: signature,
             status: 'completed',
-            examNotificationId: examNotificationId || null
+            examNotificationId: examNotificationId || null,
+            selectedSubjects: selectedSubjects || []
         });
 
         await payment.save();
@@ -174,6 +279,26 @@ const verifyPayment = async (req, res) => {
             student.transportFeeDue = Math.max(0, student.transportFeeDue - amount); // Update Top-level
             await student.save();
             feeTypeLabel = 'Transport Fee';
+        } else if (paymentType === 'hostel_fee') {
+            distributePayment('hostel', amount);
+            student.hostelFeeDue = Math.max(0, student.hostelFeeDue - amount);
+            await student.save();
+            feeTypeLabel = 'Hostel Fee';
+        } else if (paymentType === 'placement_fee') {
+            distributePayment('placement', amount);
+            student.placementFeeDue = Math.max(0, student.placementFeeDue - amount);
+            await student.save();
+            feeTypeLabel = 'Placement Fee';
+        } else if (paymentType === 'library_fee') {
+            distributePayment('library', amount);
+            student.libraryFeeDue = Math.max(0, student.libraryFeeDue - amount);
+            await student.save();
+            feeTypeLabel = 'Library Fee';
+        } else if (paymentType === 'other_fee') {
+            distributePayment('other', amount);
+            student.otherFeeDue = Math.max(0, student.otherFeeDue - amount);
+            await student.save();
+            feeTypeLabel = 'Other Fee';
         } else if (paymentType === 'exam_fee') {
             feeTypeLabel = 'Exam Fee';
         }

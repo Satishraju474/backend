@@ -20,7 +20,12 @@ const getNotifications = async (req, res) => {
 // @access  Private (Exam Head, Admin)
 const createNotification = async (req, res) => {
     try {
-        const { title, year, semester, examFeeAmount, startDate, lastDateWithoutFine, endDate, description, examType } = req.body;
+        const { title, year, semester, examFeeAmount, startDate, lastDateWithoutFine, endDate, description, examType, subjects, examCode, examName } = req.body;
+
+        // Basic Validation for Supplementary
+        if (examType === 'supplementary' && (!subjects || subjects.length === 0)) {
+            return res.status(400).json({ message: 'Supplementary exams must have subjects' });
+        }
 
         const notification = new ExamNotification({
             title,
@@ -31,7 +36,10 @@ const createNotification = async (req, res) => {
             lastDateWithoutFine,
             endDate,
             description,
-            examType
+            examType,
+            subjects,
+            examCode,
+            examName
         });
 
         const createdNotification = await notification.save();

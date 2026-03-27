@@ -15,7 +15,8 @@ const {
     promoteStudents,
     getAnalytics,
     getStudents,
-    getLogs
+    getLogs,
+    getExamDashboardStats
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
@@ -33,6 +34,7 @@ router.delete('/notifications/:id', protect, authorize('admin', 'exam_head'), de
 // Publicly accessible for now, but usually protected for students to get "My" notifications
 router.get('/notifications', protect, getExamNotifications);
 router.get('/stats', protect, authorize('admin', 'principal', 'exam_head'), getDashboardStats);
+router.get('/stats/exam', protect, authorize('admin', 'exam_head'), getExamDashboardStats);
 router.get('/analytics', protect, authorize('admin'), getAnalytics);
 
 // Promotion Routes

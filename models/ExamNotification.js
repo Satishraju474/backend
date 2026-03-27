@@ -11,7 +11,14 @@ const examNotificationSchema = mongoose.Schema({
     lastDateWithoutFine: { type: Date },
     lateFee: { type: Number, default: 0 },
     description: { type: String },
-    examType: { type: String, enum: ['regular', 'supplementary'], default: 'regular' },
+    subjects: [{
+        subjectName: { type: String, required: true },
+        subjectCode: { type: String, required: true },
+        fee: { type: Number } // Optional now for supplementary
+    }],
+    examCode: { type: String },
+    examName: { type: String },
+    examType: { type: String, enum: ['regular', 'supplementary', 'mid'], default: 'regular' },
     isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
